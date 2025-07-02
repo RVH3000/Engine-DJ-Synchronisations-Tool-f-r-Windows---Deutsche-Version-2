@@ -137,8 +137,9 @@ def eltern_markieren(tree, item):
             tree.item(uebergeordneter_knoten, text = neuer_uebergeordneter_text)
             tree.selection_add(uebergeordneter_knoten)
             eltern_knoten2 = tree.parent(uebergeordneter_knoten)
-            eltern_knoten2_text = tree.item(eltern_knoten2, 'text')
-            eltern_markieren(tree, eltern_knoten2)
+            if eltern_knoten2:  # Null-Check hinzugefügt um Infinite Recursion zu vermeiden
+                eltern_knoten2_text = tree.item(eltern_knoten2, 'text')
+                eltern_markieren(tree, eltern_knoten2)
     if not uebergeordneter_knoten:  # Wenn kein übergeordneter Knoten existiert
         wurzel_text = tree.item(item, 'text')
         neuer_wurzel_text = wurzel_text.replace('[📀]', '[✅]', 1)
@@ -162,7 +163,8 @@ def eltern_demarkieren(tree, item):
             tree.item(uebergeordneter_knoten, text = neuer_uebergeordneter_text)
             tree.selection_remove(uebergeordneter_knoten)
             eltern_knoten2 = tree.parent(uebergeordneter_knoten)
-            eltern_knoten2_text = tree.item(eltern_knoten2, 'text')
+            if eltern_knoten2:  # Null-Check hinzugefügt um Infinite Recursion zu vermeiden
+                eltern_knoten2_text = tree.item(eltern_knoten2, 'text')
             eltern_demarkieren(tree, uebergeordneter_knoten)
     if not uebergeordneter_knoten:  # Wenn kein übergeordneter Knoten existiert, Kinder durchgehen
         wurzel_kinder = tree.get_children(item)
@@ -280,29 +282,41 @@ def combobox_auswaehlen(event):
     verlauf_ergebnisse = []
     phrase_verlauf = os.path.join(wert, "Engine Library", "Database2", "hm.db")
     if os.path.isfile(phrase_verlauf):
-        verlauf_verbindung = sqlite3.connect(phrase_verlauf)
-        verlauf_cursor = verlauf_verbindung.cursor()
-        verlauf_cursor.execute("SELECT startTime, timezone FROM Historylist")
-        verlauf_ergebnisse = verlauf_cursor.fetchall()
+        try:
+            verlauf_verbindung = sqlite3.connect(phrase_verlauf)
+            verlauf_cursor = verlauf_verbindung.cursor()
+            verlauf_cursor.execute("SELECT startTime, timezone FROM Historylist")
+            verlauf_ergebnisse = verlauf_cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"Fehler beim Lesen der Verlauf-Datenbank: {e}")
+            verlauf_ergebnisse = []
+        finally:
+            if 'verlauf_verbindung' in locals():
+                verlauf_verbindung.close()
 
 ## SICHERSTELLEN DASS DIE DATENBANK AUF DEM LAUFWERK EXISTIERT
     if os.path.isfile(phrase):
         # Label mit Datenbank-Info aktualisieren
         label_links.config(text=phrase)
-        # Verbindung zur Datenbank und Datenextraktion
-        verbindung = sqlite3.connect(phrase)
-        cursor1 = verbindung.cursor()
-        cursor1.execute("SELECT id, title, parentListId FROM Playlist WHERE isPersisted = 1 ORDER BY parentListId")
-        global ergebnisse1
-        global ergebnisse2
-        ergebnisse1 = []
-        ergebnisse2 = []
+        # Verbindung zur Datenbank und Datenextraktion (Optimiert für bessere Performance)
+        try:
+            verbindung = sqlite3.connect(phrase)
+            cursor1 = verbindung.cursor()
+            
+            # Batch-Query für bessere Performance
+            cursor1.execute("SELECT id, title, parentListId FROM Playlist WHERE isPersisted = 1 ORDER BY parentListId")
+            global ergebnisse1
+            global ergebnisse2
+            ergebnisse1 = cursor1.fetchall()
+            ergebnisse2 = []
 
-# SMARTLIST BUTTON
-        smartlist_ergebnisse = []
-        ergebnisse1 = cursor1.fetchall()
-        cursor1.execute("SELECT title FROM Smartlist")
-        smartlist_ergebnisse = cursor1.fetchall()
+            # SMARTLIST BUTTON - Optimierte Abfrage
+            cursor1.execute("SELECT title FROM Smartlist")
+            smartlist_ergebnisse = cursor1.fetchall()
+        except sqlite3.Error as e:
+            print(f"Fehler beim Lesen der Hauptdatenbank: {e}")
+            ergebnisse1 = []
+            smartlist_ergebnisse = []
         if smartlist_ergebnisse:
             button50.config(state='active')
             for smarts in smartlist_ergebnisse:
@@ -311,7 +325,13 @@ def combobox_auswaehlen(event):
                 tree_left.insert("", 'end', titel, text='⭐ Smartlist ' + titel_text)
         else:
             button50.config(state='disabled')
-        verbindung.close()
+        
+        # Sichere Datenbankverbindung schließen
+        try:
+            if 'verbindung' in locals():
+                verbindung.close()
+        except sqlite3.Error as e:
+            print(f"Fehler beim Schließen der Datenbankverbindung: {e}")
 # PRÜFEN OB DIE DATENBANK NICHT LEER IST
         if ergebnisse1:
             # Ergebnisse in Treeview einfügen
@@ -385,31 +405,46 @@ def combobox2_auswaehlen(event):
     verlauf_ergebnisse = []
     phrase_verlauf = os.path.join(wert, "Engine Library", "Database2", "hm.db")
     if os.path.isfile(phrase_verlauf):
-        verlauf_verbindung = sqlite3.connect(phrase_verlauf)
-        verlauf_cursor = verlauf_verbindung.cursor()
-        verlauf_cursor.execute("SELECT startTime, timezone FROM Historylist")
-        verlauf_ergebnisse = verlauf_cursor.fetchall()
+        try:
+            verlauf_verbindung = sqlite3.connect(phrase_verlauf)
+            verlauf_cursor = verlauf_verbindung.cursor()
+            verlauf_cursor.execute("SELECT startTime, timezone FROM Historylist")
+            verlauf_ergebnisse = verlauf_cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"Fehler beim Lesen der Verlauf-Datenbank: {e}")
+            verlauf_ergebnisse = []
+        finally:
+            if 'verlauf_verbindung' in locals():
+                verlauf_verbindung.close()
     
 ## SICHERSTELLEN DASS DIE DATENBANK AUF DEM LAUFWERK EXISTIERT
     if os.path.isfile(phrase2):
         # Label mit Datenbank-Info aktualisieren
         label_rechts.config(text=phrase2)
-        # Verbindung zur Datenbank und Datenextraktion
-        verbindung2 = sqlite3.connect(phrase2)
-        cursor2 = verbindung2.cursor()
-        global ergebnisse1
-        global ergebnisse2
-        global ergebnisse3
-        ergebnisse1 = []
-        ergebnisse2 = []
-        ergebnisse3 = []
-        tree_right.tag_configure('red', foreground='red')  # Tag für roten Text
-        cursor2.execute("SELECT id, title, parentListId FROM Playlist WHERE isPersisted = 1 ORDER BY parentListId")
-        ergebnisse2 = cursor2.fetchall()
-        cursor2.execute("SELECT id, title, parentListId FROM Playlist WHERE isPersisted = 0 ORDER BY parentListId")
-        nicht_persistierte_ergebnisse = cursor2.fetchall()
-        cursor2.execute("SELECT title FROM Smartlist")
-        smartlist_ergebnisse = cursor2.fetchall()
+        # Verbindung zur Datenbank und Datenextraktion (Optimiert für bessere Performance)
+        try:
+            verbindung2 = sqlite3.connect(phrase2)
+            cursor2 = verbindung2.cursor()
+            global ergebnisse1
+            global ergebnisse2
+            global ergebnisse3
+            ergebnisse1 = []
+            ergebnisse2 = []
+            ergebnisse3 = []
+            tree_right.tag_configure('red', foreground='red')  # Tag für roten Text
+            
+            # Batch-Queries für bessere Performance
+            cursor2.execute("SELECT id, title, parentListId FROM Playlist WHERE isPersisted = 1 ORDER BY parentListId")
+            ergebnisse2 = cursor2.fetchall()
+            cursor2.execute("SELECT id, title, parentListId FROM Playlist WHERE isPersisted = 0 ORDER BY parentListId")
+            nicht_persistierte_ergebnisse = cursor2.fetchall()
+            cursor2.execute("SELECT title FROM Smartlist")
+            smartlist_ergebnisse = cursor2.fetchall()
+        except sqlite3.Error as e:
+            print(f"Fehler beim Lesen der rechten Datenbank: {e}")
+            ergebnisse2 = []
+            nicht_persistierte_ergebnisse = []
+            smartlist_ergebnisse = []
         knoten2 = {}
         knoten3 = {}
         if smartlist_ergebnisse:
@@ -447,7 +482,13 @@ def combobox2_auswaehlen(event):
                 else:
                     # Wenn Elternelement vorhanden, als Kindknoten einfügen
                     tree_right.insert(parentListId, 'end', id, text='[📛] '+ title, tags=('red',))
-        verbindung2.close()
+        
+        # Sichere Datenbankverbindung schließen
+        try:
+            if 'verbindung2' in locals():
+                verbindung2.close()
+        except sqlite3.Error as e:
+            print(f"Fehler beim Schließen der rechten Datenbankverbindung: {e}")
 
     # WENN DIE DATENBANK NICHT EXISTIERT
     else:
